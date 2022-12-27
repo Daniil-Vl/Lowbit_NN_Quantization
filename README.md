@@ -1,2 +1,2 @@
-# practice_3-4_semester
-This repository contains a research project on "Low Bit NN Quantization"
+# Lowbit_NN_Quantization
+This repository contains a research project on topic "Low Bit NN Quantization"
