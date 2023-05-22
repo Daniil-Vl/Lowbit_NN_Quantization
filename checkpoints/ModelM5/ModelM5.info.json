@@ -1,0 +1,1 @@
+{"seed": 42, "model_achitecture": "ModelM5", "epoch": 20, "accuracy_with_quant_calc": 0.1, "accuracy_without_quant_calc": 0.9905}

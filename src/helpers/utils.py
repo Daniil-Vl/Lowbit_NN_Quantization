@@ -76,11 +76,11 @@ def train_model(
 
             # Make predictions and calculate loss
             # If qat == True, train model, using Quantization aware training
-            if qat:
-                predictions = quant_forward_train(
-                    model, features, bitwidth, device=device)
-            else:
-                predictions = model(features)
+            # if qat:
+            #     predictions = quant_forward_train(
+            #         model, features, bitwidth, device=device)
+            # else:
+            predictions = model(features)
             loss = loss_fn(predictions, labels)
             cum_loss += loss.item()
 
@@ -156,6 +156,7 @@ def train_model(
 def test_model(model: torch.nn.Module, dataloader, qat: bool = False, bitwidth: int = 8, device: str = 'cuda') -> None:
     """
     This function implements accuracy measuring on passed dataloader (cuda)
+    Test function with quantized weights, if qat == True
     """
     model.to(device)
     model.eval()
@@ -178,17 +179,9 @@ def test_model(model: torch.nn.Module, dataloader, qat: bool = False, bitwidth: 
             else:
                 logits = model(images)
 
-            predictions = torch.log_softmax(logits, dim=1)
-            predictions = torch.argmax(input=predictions, dim=1)
-
-            try:
-                n_correct += (labels == predictions).sum().item()
-            except RuntimeError:
-                print(f"Shape of images: {images.shape}")
-                print(f"Shape of logits: {logits.shape}")
-                print(f"Shape of predictions: {predictions.shape}")
-                print(f"Shape of labels: {labels.shape}")
-                sys.exit(-1)
+            # predictions = torch.log_softmax(logits, dim=1)
+            predictions = torch.argmax(input=logits, dim=1)
+            n_correct += (labels == predictions).sum().item()
 
     print(f"Accuracy = {n_correct / n_total*100:.2f}%")
     return n_correct / n_total

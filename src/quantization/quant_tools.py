@@ -73,13 +73,13 @@ class QuantizedTensor(object):
 
 # Quantization functions ====================================================================
 # Uniform quantization ==========================================
-def __quantize_tensor(tensor: torch.Tensor, scale: int, zero_point: int, device: str = 'cpu') -> QuantizedTensor:
+def __quantize_tensor(tensor: torch.Tensor, scale: int, zero_point: int, device: str = 'cuda') -> QuantizedTensor:
     res = QuantizedTensor(tensor).to(device)
     res.set_scale(scale)
     res.set_zero_point(zero_point)
 
     # FIXME: Was cuda
-    return torch.round(res/scale).to(device) - torch.tensor([zero_point]).to(device)
+    return (torch.round(res/torch.tensor([scale]).to(device)).to(device) - torch.tensor([zero_point]).to(device)).to(device)
 
 # Calculations ======================================================
 
@@ -145,7 +145,7 @@ class FakeQuantOp(torch.autograd.Function):
     using Straight Through Estimator (STE) for backward pass 
     """
     @staticmethod
-    def forward(ctx, x, num_bits=8, device='cpu', min_val=None, max_val=None):
+    def forward(ctx, x, num_bits=8, device='cuda', min_val=None, max_val=None):
         x = quantize(x, bitwidth=num_bits, device=device)
         x = dequantize(x)
         return x
@@ -154,6 +154,40 @@ class FakeQuantOp(torch.autograd.Function):
     def backward(ctx, grad_output):
         # straight through estimator
         return grad_output, None, None, None
+
+
+class Conv2d(torch.nn.Conv2d):
+    """
+    Convolution layer with DoReFa quantization
+    """
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, groups=1, dilation=1, bias=False, bitwidth=2):
+        super(Conv2d, self).__init__(in_channels, out_channels,
+                                     kernel_size, stride, padding, groups, dilation, bias)
+        self.quantize = FakeQuantOp.apply
+        self.bitwidth = bitwidth
+
+    def forward(self, x):
+        quantized_weights = self.quantize(self.weight, self.bitwidth)
+        y = F.conv2d(x, quantized_weights, self.bias, self.stride,
+                     self.padding, self.dilation, self.groups)
+        return y
+
+
+class Linear(torch.nn.Linear):
+    """
+    Linear layer with DoReFa quantization
+    """
+
+    def __init__(self, in_features, out_features, bias=True, bitwidth=2):
+        super(Linear, self).__init__(in_features, out_features, bias)
+        self.quantize = FakeQuantOp.apply
+        self.bitwidth = bitwidth
+
+    def forward(self, x):
+        quantized_weights = self.quantize(self.weight, self.bitwidth)
+        y = F.linear(x, quantized_weights, self.bias)
+        return y
 
 
 def quant_forward_train(model: torch.nn.Module, features_batch: torch.Tensor, bit_width: int = 8, device: str = 'cuda'):
@@ -218,7 +252,7 @@ def quant_forward_eval(model: torch.nn.Module, features_batch: torch.Tensor, bit
     for name, module in model.named_children():
         if isinstance(module, torch.nn.Sequential) or \
            isinstance(module, torchvision.models.resnet.Bottleneck):
-            features_batch = quant_forward_train(
+            features_batch = quant_forward_eval(
                 module, features_batch, bit_width, device)
 
         elif isinstance(module, torch.nn.BatchNorm2d):
@@ -226,7 +260,11 @@ def quant_forward_eval(model: torch.nn.Module, features_batch: torch.Tensor, bit
 
         elif isinstance(module, torch.nn.Conv2d):
             weights = module.weight.data
-            quantized_weights = quantize(weights, bit_width, train=False)
+
+            weights = weights.to(device)
+            quantized_weights = quantize(
+                weights, bit_width, train=False).to(device)
+
             features_batch = F.conv2d(
                 input=features_batch,
                 weight=quantized_weights
@@ -238,9 +276,11 @@ def quant_forward_eval(model: torch.nn.Module, features_batch: torch.Tensor, bit
 
             # Get weights
             weights = module.weight.data
+            weights = weights.to(device)
 
             # Quantize weights
-            quantized_weights = quantize(weights, bit_width, train=False)
+            quantized_weights = quantize(
+                weights, bit_width, train=False).to(device)
 
             # Apply linear operation using quantized weights
             features_batch = F.linear(

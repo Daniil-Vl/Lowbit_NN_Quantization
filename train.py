@@ -112,7 +112,7 @@ def run(
     elif (KERNEL_SIZE == 3):
         model = ModelM3().to(device)
     elif (KERNEL_SIZE == 5):
-        model = ModelM5().to(device)
+        model = ModelM5(bitwidth=bitwidth).to(device)            
     elif (KERNEL_SIZE == 7):
         model = ModelM7().to(device)
 

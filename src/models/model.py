@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.quantization.quant_tools import Conv2d, Linear
+
 from torchvision.models import resnet50, ResNet50_Weights, googlenet
 
 __all__ = [
@@ -70,19 +72,25 @@ class ModelM3(nn.Module):
 
 
 class ModelM5(nn.Module):
-    def __init__(self):
+    def __init__(self, bitwidth: int = 2):
         super(ModelM5, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 5, bias=False)
+        # self.conv1 = nn.Conv2d(1, 32, 5, bias=False)
+        self.conv1 = Conv2d(1, 32, 5, bias=False, bitwidth=bitwidth)
         self.conv1_bn = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, 5, bias=False)
+        # self.conv2 = nn.Conv2d(32, 64, 5, bias=False)
+        self.conv2 = Conv2d(32, 64, 5, bias=False, bitwidth=bitwidth)
         self.conv2_bn = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 96, 5, bias=False)
+        # self.conv3 = nn.Conv2d(64, 96, 5, bias=False)
+        self.conv3 = Conv2d(64, 96, 5, bias=False, bitwidth=bitwidth)
         self.conv3_bn = nn.BatchNorm2d(96)
-        self.conv4 = nn.Conv2d(96, 128, 5, bias=False)
+        # self.conv4 = nn.Conv2d(96, 128, 5, bias=False)
+        self.conv4 = Conv2d(96, 128, 5, bias=False, bitwidth=bitwidth)
         self.conv4_bn = nn.BatchNorm2d(128)
-        self.conv5 = nn.Conv2d(128, 160, 5, bias=False)
+        # self.conv5 = nn.Conv2d(128, 160, 5, bias=False)
+        self.conv5 = Conv2d(128, 160, 5, bias=False, bitwidth=bitwidth)
         self.conv5_bn = nn.BatchNorm2d(160)
-        self.fc1 = nn.Linear(10240, 10, bias=False)
+        # self.fc1 = nn.Linear(10240, 10, bias=False)
+        self.fc1 = Linear(10240, 10, bias=False, bitwidth=bitwidth)
         self.fc1_bn = nn.BatchNorm1d(10)
 
     def get_logits(self, x):
